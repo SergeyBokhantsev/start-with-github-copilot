@@ -78,6 +78,67 @@ activities = {
 }
 
 
+# Business Logic Functions (testable, separate from endpoints)
+
+def get_all_activities():
+    """Get all available activities with their details"""
+    return activities
+
+
+def signup_student(activity_name: str, email: str):
+    """
+    Sign up a student for an activity.
+    
+    Args:
+        activity_name: Name of the activity
+        email: Student email address
+        
+    Raises:
+        KeyError: If activity does not exist
+        ValueError: If student is already signed up or other validation fails
+    """
+    # Validate activity exists
+    if activity_name not in activities:
+        raise KeyError(f"Activity '{activity_name}' not found")
+    
+    activity = activities[activity_name]
+    
+    # Validate student is not already signed up
+    if email in activity["participants"]:
+        raise ValueError(f"Student {email} is already signed up for {activity_name}")
+    
+    # Add student
+    activity["participants"].append(email)
+
+
+def cancel_student_signup(activity_name: str, email: str):
+    """
+    Cancel a student's signup for an activity.
+    
+    Args:
+        activity_name: Name of the activity
+        email: Student email address
+        
+    Raises:
+        KeyError: If activity does not exist
+        ValueError: If student is not signed up for the activity
+    """
+    # Validate activity exists
+    if activity_name not in activities:
+        raise KeyError(f"Activity '{activity_name}' not found")
+    
+    activity = activities[activity_name]
+    
+    # Check if student is registered
+    if email not in activity["participants"]:
+        raise ValueError(f"Student {email} is not signed up for {activity_name}")
+    
+    # Remove student
+    activity["participants"].remove(email)
+
+
+# API Endpoints
+
 @app.get("/")
 def root():
     return RedirectResponse(url="/static/index.html")
@@ -85,42 +146,29 @@ def root():
 
 @app.get("/activities")
 def get_activities():
-    return activities
+    """Get all available activities"""
+    return get_all_activities()
 
 
 @app.post("/activities/{activity_name}/signup")
 def signup_for_activity(activity_name: str, email: str):
     """Sign up a student for an activity"""
-    # Validate activity exists
-    if activity_name not in activities:
+    try:
+        signup_student(activity_name, email)
+        return {"message": f"Signed up {email} for {activity_name}"}
+    except KeyError:
         raise HTTPException(status_code=404, detail="Activity not found")
-
-    # Get the specific activity
-    activity = activities[activity_name]
-
-    #Validate student is not already signed up
-    if email in activity["participants"]:
-        raise HTTPException(status_code=400, detail="Student already signed up for this activity")
-
-    # Add student
-    activity["participants"].append(email)
-    return {"message": f"Signed up {email} for {activity_name}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/activities/{activity_name}/cancel")
 def cancel_activity_signup(activity_name: str, email: str):
     """Cancel a student's registration for an activity"""
-    # Validate activity exists
-    if activity_name not in activities:
+    try:
+        cancel_student_signup(activity_name, email)
+        return {"message": f"Unregistered {email} from {activity_name}"}
+    except KeyError:
         raise HTTPException(status_code=404, detail="Activity not found")
-
-    # Get the specific activity
-    activity = activities[activity_name]
-
-    # Check if student is registered
-    if email not in activity["participants"]:
-        raise HTTPException(status_code=400, detail="Student is not signed up for this activity")
-
-    # Remove student
-    activity["participants"].remove(email)
-    return {"message": f"Unregistered {email} from {activity_name}"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
